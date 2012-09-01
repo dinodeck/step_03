@@ -10,6 +10,7 @@
 #include "IO.h"
 
 
+
 //
 // Reloads the settings file
 //
@@ -59,13 +60,8 @@ bool Main::OnAssetReload(Asset& asset)
         return false; // You can't do much without assets!
     }
 
-    // 1. Is the resource file the same as in previous loads?
-    //mAssetStore.Refresh(manifestPath);
-
- //        // Get the manifest location
- //
- //       // mAssetStore.LoadFromFile(manifestPath.c_str());
-	// }
+    // 1. Is the asset file the same as in previous loads?
+    mAssetStore.Reload(manifestPath);
 
 	return true;
 }
@@ -79,9 +75,8 @@ void Main::ReloadGame()
 {
     // Should have been created in the constructor.
     assert(mSettingsFile);
-    //
-    // Should be checking if it's needs reloading but ok for now
-    //
+
+
     if( AssetStore::IsOutOfDate(*mSettingsFile) )
     {
         bool success = mSettingsFile->OnReload();
@@ -95,7 +90,9 @@ void Main::ReloadGame()
     }
     else
     {
-        printf("Settings file hasn't changed.\n");
+        printf("[%s] SKIPPED.\n", mSettingsFile->Path().c_str());
+        // But that doesn't mean the manifest or other files haven't
+        mAssetStore.Reload();
     }
 
 
@@ -111,7 +108,7 @@ Main::Main() :
  mViewWidth(640),
  mViewHeight(360)
 {
-    mSettingsFile = new Asset("settings", "./settings.lua", this);
+    mSettingsFile = new Asset("settings", "settings.lua", this);
 }
 
 Main::~Main()

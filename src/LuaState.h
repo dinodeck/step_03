@@ -28,6 +28,7 @@ public:
 	// Not sure about this approach.
 	std::string GetString(const char* key, const char* defaultStr);
 	int GetInt(const char* key, int defaultInt);
+
 };
 
 #endif

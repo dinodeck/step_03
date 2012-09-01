@@ -5,12 +5,27 @@
 #include "Asset.h"
 
 class IAssetLoader;
+struct lua_State;
 
 class AssetStore : IAssetLoader
 {
 private:
 	std::map<std::string, Asset> mStore;
-
+    Asset* mManifest;
+    bool ReloadAssets();
+    struct AssetDef
+    {
+        const char* name;
+        const char* path;
+        AssetDef(const char* name, const char* path) :
+            name(name), path(path) {}
+    };
+    bool LoadLuaTableToAssetDefs(lua_State* state,
+                                 const char* tableName,
+                                 std::map<std::string, AssetStore::AssetDef>& destination);
+    bool LoadAssetSubTable(lua_State* state, const char* tableName, const char* path);
+    bool LoadAssetDef(lua_State* state,
+                      std::map<std::string, AssetStore::AssetDef>& destination);
 public:
 	AssetStore();
 	~AssetStore();
@@ -24,8 +39,9 @@ public:
 
 	void Add(const char* name, const char* path, IAssetLoader* callback);
 
-    // Go through all assets and try and reload
-	void Reload();
+    // Check the manifest
+	bool Reload();
+    bool Reload(const std::string& manifestPath);
     // Load in the asset file, if it's not changed.
     //bool LoadFromFile(const char* path);
     bool AssetExists(const char* name);
