@@ -32,7 +32,6 @@ LuaState::LuaState(const char* name)
 	mName = name;
 	// lua_newstate( MemHandler, NULL ); <- can use this to get some mem stats
 	mLuaState = lua_open();
-	printf("Just opened: %d\n", ItemsInStack());
 	luaL_openlibs(mLuaState);
 	// Push minigame instance pointer in the lua state
 	// So for static functions (used by Lua) we can find out the minigame associated with a lua state

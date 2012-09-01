@@ -1,33 +1,125 @@
 #include "Main.h"
 #include <stdio.h>
+#include <assert.h>
+#include <time.h>
 #include "LuaState.h"
-#include "Resource.h"
-#include "ResourceStore.h"
+#include "Asset.h"
+#include "AssetStore.h"
 #include <gl/gl.h>
 #include "SDL/SDL.h"
+#include "IO.h"
 
-bool Main::Reload(Resource& resource)
+
+//
+// Reloads the settings file
+//
+bool Main::OnAssetReload(Asset& asset)
 {
-	printf("Reloading Manifest");
-	LuaState luaState("Settings");
-	bool success = luaState.DoFile(resource.Path().c_str());
-	if(success)
-	{
-		mName = luaState.GetString("name", mName.c_str());
-		mViewWidth = luaState.GetInt("width", mViewWidth);
-		mViewHeight = luaState.GetInt("height", mViewHeight);
-		//mName = luaState.GetEntryString("name", mName);
-	}
+    printf("-Reloading Settings-\n");
+    const char* path = asset.Path().c_str();
 
-	// If this fails, it should go back to the defaults
-	ResetRenderWindow();
-	return success;
+    if(!IO::FileExists(path))
+    {
+
+        printf("Settings file [%s] doesn't exist.\n", path);
+
+        // If the settings file doesn't exist, then the assets
+        // should be cleared. As they're no longer in the project.
+        mAssetStore.Clear();
+
+        return false;
+    }
+
+    //
+    // Create a lua state to parse the settings file
+    //
+    LuaState luaState("Settings");
+	bool success = luaState.DoFile(path);
+
+    if(!success)
+    {
+        printf("Lua failed to parse settings [%s].\n", path);
+        // For now don't clear the asset store.
+        return false;
+    }
+
+    // Get values, or assign defaults if not present.
+    mName = luaState.GetString("name", mName.c_str());
+    mViewWidth = luaState.GetInt("width", mViewWidth);
+    mViewHeight = luaState.GetInt("height", mViewHeight);
+    ResetRenderWindow();
+
+    std::string manifestPath = luaState.GetString("manifest", "");
+
+    if(!IO::FileExists(manifestPath.c_str()))
+    {
+        printf("Manifest file doesn't exist [%s]\n", manifestPath.c_str());
+        printf("Manifest file is specified in settings.lua e.g. manifest=\"manifest.lua\"\n");
+        mAssetStore.Clear();
+        return false; // You can't do much without assets!
+    }
+
+    // 1. Is the resource file the same as in previous loads?
+    //mAssetStore.Refresh(manifestPath);
+
+ //        // Get the manifest location
+ //
+ //       // mAssetStore.LoadFromFile(manifestPath.c_str());
+	// }
+
+	return true;
+}
+
+void Main::OnAssetDestroyed(Asset& asset)
+{
+
+}
+
+void Main::ReloadGame()
+{
+    // Should have been created in the constructor.
+    assert(mSettingsFile);
+    //
+    // Should be checking if it's needs reloading but ok for now
+    //
+    if( AssetStore::IsOutOfDate(*mSettingsFile) )
+    {
+        bool success = mSettingsFile->OnReload();
+
+        if(success)
+        {
+            // Update the timestamp
+            time_t lastModified = AssetStore::GetModifiedTimeStamp(*mSettingsFile);
+            mSettingsFile->SetTimeLastModified(lastModified);
+        }
+    }
+    else
+    {
+        printf("Settings file hasn't changed.\n");
+    }
+
+
 }
 
 Main::Main() :
- mName("Dancing Squid"), mSurface(0), mResourceStore(), mDeltaTime(0), mRunning(true), mViewWidth(640), mViewHeight(360)
+ mName("Dancing Squid"),
+ mSurface(0),
+ mAssetStore(),
+ mSettingsFile(NULL),
+ mDeltaTime(0),
+ mRunning(true),
+ mViewWidth(640),
+ mViewHeight(360)
 {
-	mResourceStore.Add("manifest", "manifest.lua", this);
+    mSettingsFile = new Asset("settings", "./settings.lua", this);
+}
+
+Main::~Main()
+{
+    if(mSettingsFile)
+    {
+        delete mSettingsFile;
+    }
 }
 
 void Main::OnEvent(SDL_Event* event)
@@ -48,7 +140,7 @@ void Main::OnEvent(SDL_Event* event)
             }
             else if(event->key.keysym.sym == SDLK_F2)
             {
-				mResourceStore.Reload();
+                ReloadGame();
             }
 
         } break;
@@ -87,6 +179,14 @@ bool Main::ResetRenderWindow()
     return true;
 }
 
+void Main::OnOpenGLContextCreated()
+{
+
+    ReloadGame();
+    // Setup the window
+    ResetRenderWindow();
+}
+
 
 void Main::Execute()
 {
@@ -115,7 +215,7 @@ void Main::Execute()
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS,  1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES,  2);
 
-    mResourceStore.Reload();
+    OnOpenGLContextCreated();
 
     unsigned int thisTime = 0;
     unsigned int lastTime = 0;
