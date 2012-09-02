@@ -18,8 +18,6 @@ private:
 public:
 	LuaState(const char* name);
 	~LuaState();
-	lua_State* State() const;
-	unsigned int ItemsInStack();
 
 	// Execute lua string, on error will print error and stacktrace if possible.
 	bool DoString(const char* str);
@@ -28,7 +26,10 @@ public:
 	// Not sure about this approach.
 	std::string GetString(const char* key, const char* defaultStr);
 	int GetInt(const char* key, int defaultInt);
-
+	void Reset();
+	void CollectGarbage();
+	lua_State* State() const;
+	unsigned int ItemsInStack();
 };
 
 #endif

@@ -8,8 +8,34 @@
 #include <gl/gl.h>
 #include "SDL/SDL.h"
 #include "IO.h"
+#include "Game.h"
 
 
+Main::Main() :
+ mSurface(0),
+ mAssetStore(),
+ mSettingsFile(NULL),
+ mDeltaTime(0),
+ mRunning(true),
+ mGame(NULL)
+{
+    mSettingsFile = new Asset("settings", "settings.lua", this);
+    mGame = new Game(&mSettings, &mAssetStore);
+    mAssetStore.RegisterAssetOwner("scripts", mGame);
+}
+
+Main::~Main()
+{
+    if(mSettingsFile)
+    {
+        delete mSettingsFile;
+    }
+
+    if(mGame)
+    {
+        delete mGame;
+    }
+}
 
 //
 // Reloads the settings file
@@ -45,23 +71,25 @@ bool Main::OnAssetReload(Asset& asset)
     }
 
     // Get values, or assign defaults if not present.
-    mName = luaState.GetString("name", mName.c_str());
-    mViewWidth = luaState.GetInt("width", mViewWidth);
-    mViewHeight = luaState.GetInt("height", mViewHeight);
+    mSettings.name = luaState.GetString("name", mSettings.name.c_str());
+    mSettings.width = luaState.GetInt("width", mSettings.width);
+    mSettings.height = luaState.GetInt("height", mSettings.height);
+    mSettings.mainScript = luaState.GetString("main_script", "main.lua");
+    mSettings.onUpdate = luaState.GetString("on_update", "update()");
+    mSettings.manifestPath = luaState.GetString("manifest", "");
+
     ResetRenderWindow();
 
-    std::string manifestPath = luaState.GetString("manifest", "");
-
-    if(!IO::FileExists(manifestPath.c_str()))
+    if(!IO::FileExists(mSettings.manifestPath.c_str()))
     {
-        printf("Manifest file doesn't exist [%s]\n", manifestPath.c_str());
+        printf("Manifest file doesn't exist [%s]\n", mSettings.manifestPath.c_str());
         printf("Manifest file is specified in settings.lua e.g. manifest=\"manifest.lua\"\n");
         mAssetStore.Clear();
         return false; // You can't do much without assets!
     }
 
     // 1. Is the asset file the same as in previous loads?
-    mAssetStore.Reload(manifestPath);
+    mAssetStore.Reload(mSettings.manifestPath);
 
 	return true;
 }
@@ -76,6 +104,7 @@ void Main::ReloadGame()
     // Should have been created in the constructor.
     assert(mSettingsFile);
 
+    mGame->ResetReloadCount();
 
     if( AssetStore::IsOutOfDate(*mSettingsFile) )
     {
@@ -95,28 +124,11 @@ void Main::ReloadGame()
         mAssetStore.Reload();
     }
 
-
-}
-
-Main::Main() :
- mName("Dancing Squid"),
- mSurface(0),
- mAssetStore(),
- mSettingsFile(NULL),
- mDeltaTime(0),
- mRunning(true),
- mViewWidth(640),
- mViewHeight(360)
-{
-    mSettingsFile = new Asset("settings", "settings.lua", this);
-}
-
-Main::~Main()
-{
-    if(mSettingsFile)
+    if(mGame->GetReloadCount() > 0)
     {
-        delete mSettingsFile;
+        mGame->Reset();
     }
+
 }
 
 void Main::OnEvent(SDL_Event* event)
@@ -146,24 +158,24 @@ void Main::OnEvent(SDL_Event* event)
 
 bool Main::ResetRenderWindow()
 {
-    SDL_WM_SetCaption(mName.c_str(), mName.c_str());
+    SDL_WM_SetCaption(mSettings.name.c_str(), mSettings.name.c_str());
 
     // SDL handles this surface memory, so it can be called multiple times without issue.
-    if((mSurface = SDL_SetVideoMode(mViewWidth, mViewHeight, 32, SDL_HWSURFACE | SDL_GL_DOUBLEBUFFER | SDL_OPENGL)) == NULL)
+    if((mSurface = SDL_SetVideoMode(mSettings.width, mSettings.height, 32, SDL_HWSURFACE | SDL_GL_DOUBLEBUFFER | SDL_OPENGL)) == NULL)
     {
         printf("Error initializing graphics: %s\n", SDL_GetError());
         return false;
     }
 
-    SDL_WarpMouse(mViewWidth/2, mViewHeight/2);
+    SDL_WarpMouse(mSettings.width/2, mSettings.height/2);
 
 
     glClearColor(0, 0, 0, 0);
-    glViewport(0, 0, mViewWidth, mViewHeight);
+    glViewport(0, 0, mSettings.width, mSettings.height);
      // Setups an orthographic view, should be handled by renderer.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0, mViewWidth, mViewHeight, 0, 1, -1);
+    glOrtho(0, mSettings.width, mSettings.height, 0, 1, -1);
     glMatrixMode(GL_MODELVIEW);
     glEnable(GL_TEXTURE_2D);
     glLoadIdentity();

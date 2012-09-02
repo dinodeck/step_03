@@ -3,7 +3,7 @@
 
 #include <string>
 #include <ctime>
-#include "IAssetLoader.h"
+#include "IAssetOwner.h"
 
 //
 // An asset is something the game uses such as a script file, texture or model
@@ -20,13 +20,13 @@ private:
 	std::string mPath;
 	std::string mName;
 	bool mIsLoaded;
-	IAssetLoader* mLoader;
+	IAssetOwner* mLoader;
 	time_t mLastModified;
 	// eCategory mCategory;
 
 	bool mTouch; // used when checking what needs to be reloaded
 public:
-	Asset(const char* name, const char* path, IAssetLoader* loader);
+	Asset(const char* name, const char* path, IAssetOwner* loader);
 
 
 	// Functions that trigger callbacks

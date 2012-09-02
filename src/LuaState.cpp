@@ -9,6 +9,20 @@ extern "C"
 }
 
 
+LuaState::LuaState(const char* name) :
+    mName(name),
+    mLuaState(NULL)
+{
+    mName = name;
+    // lua_newstate( MemHandler, NULL ); <- can use this to get some mem stats
+    Reset();
+}
+
+LuaState::~LuaState()
+{
+    lua_close(mLuaState);
+}
+
 LuaState* LuaState::GetWrapper(lua_State* luaState)
 {
 	// Needs sanity checks.
@@ -25,26 +39,6 @@ int LuaState::LuaError(lua_State* luaState)
 	assert(wrapper);
 	wrapper->OnError();
 	return 0;
-}
-
-LuaState::LuaState(const char* name)
-{
-	mName = name;
-	// lua_newstate( MemHandler, NULL ); <- can use this to get some mem stats
-	mLuaState = lua_open();
-	luaL_openlibs(mLuaState);
-	// Push minigame instance pointer in the lua state
-	// So for static functions (used by Lua) we can find out the minigame associated with a lua state
-	lua_pushliteral(mLuaState, "this");  /* push value */
-    lua_pushlightuserdata(mLuaState, (void *)this);  /* push address */
-
-    /* registry["this"] = this */
-    lua_settable(mLuaState, LUA_REGISTRYINDEX);
-}
-
-LuaState::~LuaState()
-{
-	lua_close(mLuaState);
 }
 
 void LuaState::OnError()
@@ -152,4 +146,27 @@ int LuaState::GetInt(const char* key, int defaultInt)
 	int out = luaL_optint (mLuaState, -1, defaultInt);
 	lua_pop(mLuaState, 1); // Remove key,
 	return out;
+}
+
+void LuaState::Reset()
+{
+    if(mLuaState)
+    {
+        lua_close(mLuaState);
+        mLuaState = NULL;
+    }
+    mLuaState = lua_open();
+    luaL_openlibs(mLuaState);
+    // Push minigame instance pointer in the lua state
+    // So for static functions (used by Lua) we can find out the minigame associated with a lua state
+    lua_pushliteral(mLuaState, "this");  /* push value */
+    lua_pushlightuserdata(mLuaState, (void *)this);  /* push address */
+
+    /* registry["this"] = this */
+    lua_settable(mLuaState, LUA_REGISTRYINDEX);
+}
+
+void LuaState::CollectGarbage()
+{
+    lua_gc(mLuaState, LUA_GCCOLLECT, 0);
 }

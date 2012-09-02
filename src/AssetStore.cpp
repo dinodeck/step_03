@@ -1,5 +1,5 @@
 #include "AssetStore.h"
-#include "IAssetLoader.h"
+#include "IAssetOwner.h"
 #include <map>
 #include <list>
 #include <assert.h>
@@ -32,7 +32,7 @@ AssetStore::~AssetStore()
 	}
 }
 
-void AssetStore::Add(const char* name, const char* path, IAssetLoader* callback)
+void AssetStore::Add(const char* name, const char* path, IAssetOwner* callback)
 {
 	mStore.insert(std::pair<std::string, Asset>(
 					std::string(name),
@@ -54,62 +54,6 @@ Asset* AssetStore::GetAssetByName(const char* name)
 	return &(iter->second);
 }
 
-// bool AssetStore::LoadFromFile(const char* path)
-// {
-// 	//
-// 	// This already getting complicated!
-// 	// Needs simplifying!
-// 	//
-// 	printf("Load from file called: %s\n", path);
-
-// 	if(FileExists(path)) // 0. Does this path exist?
-// 	{
-// 		//0.Yes
-// 		//1. Do we already have the Asset file?
-// 		if(AssetExists(AssetFileId()))
-// 		{
-// 			Asset* AssetFile = GetAssetByName(AssetFileId());
-
-// 			// 2. Has the path been changed
-// 			// 2.Yes -
-// 			//	Clear previous data
-// 			//  Update the path
-// 			//  Set the Asset as not loaded.
-// 			ClearAssetsFromFile();
-
-
-// 			// 2.No
-// 			// Fine everything else should get taken care of
-// 		}
-// 		else
-// 		{
-// 			Add(AssetFileId(), path, this);
-// 		}
-// 	}
-// 	else
-// 	{
-// 		// 0.No issue a warning
-// 		printf("Failed to load resource file: [%s]\n", path);
-// 		printf("Resource file is specified in settings.lua e.g. manifest=\"manifest.lua\"\n");
-// 		// It may exist in the future, so add it
-// 		if(ResourceExists(ResourceFileId()))
-// 		{
-// 			// Need to clear loaded resources
-// 			ClearResourcesFromFile();
-// 			mStore.erase(mStore.find(ResourceFileId()));
-// 		}
-
-// 		// and add it
-// 		Add(ResourceFileId(), path, this);
-// 		// because the file doesn't exist at this time
-// 		// don't try and load it.
-// 		return false;
-// 	}
-
-// 	return true;
-// }
-
-
 void AssetStore::Clear()
 {
 	if(mManifest)
@@ -124,8 +68,6 @@ void AssetStore::Clear()
 		mStore.erase( it++ );
 	}
 }
-
-
 
 bool AssetStore::OnAssetReload(Asset& asset)
 {
@@ -179,7 +121,7 @@ bool AssetStore::LoadAssetDef(lua_State* state, std::map<std::string, AssetDef>&
 		return false;
 	}
 
-	printf("Successfully called LoadResource [%s]\n", name.c_str());
+	printf("Successfully called LoadAssetDef [%s]\n", name.c_str());
 	return true;
 }
 
@@ -208,8 +150,23 @@ bool AssetStore::LoadLuaTableToAssetDefs(lua_State* state, const char* tableName
 	return true;
 }
 
+// Takes tables like this
+// scripts =
+// {
+//     ['main.lua'] =
+//     {
+//	        path = "/test/main.lua"
+//     }
+//     ... etc
+// }
+// And updates the in memory asset store intelligently.
 bool AssetStore::LoadAssetSubTable(lua_State* state, const char* tableName, const char* path)
 {
+
+	// ASSERT THAT THE ASSET-TABLE HAS A HANDLER FOR THE ASSETS
+	assert(mAssetOwnerMap.find( std::string(tableName) ) != mAssetOwnerMap.end());
+	IAssetOwner* assetOwner = mAssetOwnerMap.find( std::string(tableName) )->second;
+
 	std::map<std::string, AssetStore::AssetDef> scriptAssets;
 	bool isLoaded = false;
 	isLoaded = LoadLuaTableToAssetDefs(state, "scripts", scriptAssets);
@@ -263,7 +220,7 @@ bool AssetStore::LoadAssetSubTable(lua_State* state, const char* tableName, cons
 			// The 'this' here depends on the script type
 			// Probably GAME for scripts
 			// TEXTURE MANAGER for everything else
-			Asset asset(assetDef.name, assetDef.path, this);
+			Asset asset(assetDef.name, assetDef.path, assetOwner);
 			asset.Touch(true);
 			mStore.insert(std::pair<std::string, Asset>(
 			              assetDef.name,
@@ -360,40 +317,44 @@ bool AssetStore::Reload(const std::string& manifestPath)
 				return false;
 			}
 
-
-			std::list< std::map<std::string, Asset>::iterator > iteratorList;
-
-			// Gather up elements that need to be deleted
-			for(std::map<std::string, Asset>::iterator
-			    iter = mStore.begin();
-			    iter != mStore.end();
-			    ++iter)
-			{
-				// Are there any lua-asset that weren't touched? Remove them.
-				if(!iter->second.IsTouched())
-				{
-					printf("Removing [%s] as it's no longer in the manifest.\n",
-					iter->second.Path().c_str());
-					iter->second.OnDestroy();
-					iteratorList.push_back(iter);
-				}
-			}
-
-			// Actually delete the elements.
-			for(std::list< std::map<std::string, Asset>::iterator >::iterator
-			    iter = iteratorList.begin();
-			    iter != iteratorList.end();
-			    ++iter)
-			{
-
-			    mStore.erase(*iter);
-			}
-
-
+			RemoveAssetsNotInManifest();
+			ReloadAssets();
 		}
 		mManifest->SetIsLoaded(true);
 		printf("Here, after loading the script resources.\n");
 		return true;
+	}
+}
+
+// Assets the have a touch flag equally false are removed.
+void AssetStore::RemoveAssetsNotInManifest()
+{
+	std::list< std::map<std::string, Asset>::iterator > iteratorList;
+
+	// Gather up elements that need to be deleted
+	for(std::map<std::string, Asset>::iterator
+	    iter = mStore.begin();
+	    iter != mStore.end();
+	    ++iter)
+	{
+		// Are there any lua-asset that weren't touched? Remove them.
+		if(!iter->second.IsTouched())
+		{
+			printf("Removing [%s] as it's no longer in the manifest.\n",
+			iter->second.Path().c_str());
+			iter->second.OnDestroy();
+			iteratorList.push_back(iter);
+		}
+	}
+
+	// Actually delete the elements.
+	for(std::list< std::map<std::string, Asset>::iterator >::iterator
+	    iter = iteratorList.begin();
+	    iter != iteratorList.end();
+	    ++iter)
+	{
+
+	    mStore.erase(*iter);
 	}
 }
 
@@ -424,7 +385,7 @@ bool AssetStore::ReloadAssets()
 
 		if(asset.IsLoaded() && lastModified <= asset.LastModified())
 		{
-			printf("%s already loaded.\n", asset.Name().c_str());
+			printf("[%s] SKIPPED.\n", asset.Name().c_str());
 		}
 		else
 		{
@@ -469,4 +430,10 @@ bool AssetStore::IsOutOfDate(Asset& asset)
 
 	time_t lastModified = AssetStore::GetModifiedTimeStamp(asset);
 	return lastModified > asset.LastModified();
+}
+
+// Used when loading assets from the manifest
+void AssetStore::RegisterAssetOwner(const char* name, IAssetOwner* callback)
+{
+	mAssetOwnerMap[std::string(name)] = callback;
 }

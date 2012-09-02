@@ -1,27 +1,27 @@
 #ifndef MAIN_H
 #define MAIN_H
 #include <string>
-#include "IAssetLoader.h"
+#include "IAssetOwner.h"
 #include "AssetStore.h"
-
+#include "Settings.h"
 
 
 struct SDL_Surface;
 union SDL_Event;
 
 class Asset;
+class Game;
 
-class Main : IAssetLoader
+class Main : IAssetOwner
 {
 private:
-	std::string		mName;
+	Settings 		mSettings;
 	SDL_Surface* 	mSurface;
 	AssetStore 		mAssetStore;
 	Asset* 			mSettingsFile;
 	double 			mDeltaTime;
 	bool 			mRunning;
-	int 			mViewWidth;
-    int 			mViewHeight;
+    Game*           mGame;
 
     void OnEvent(SDL_Event* event);
 	void OnUpdate();

@@ -1,1 +1,1 @@
-print('in the main file!')
+print('[LUA:test/main.lua] the main file! This is getting called from Lua.')

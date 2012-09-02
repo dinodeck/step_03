@@ -18,12 +18,12 @@ void Asset::OnDestroy()
     mLoader->OnAssetDestroyed(*this);
 }
 
-Asset::Asset(const char* name, const char* path, IAssetLoader* loader)
+Asset::Asset(const char* name, const char* path, IAssetOwner* owner)
 {
-	assert(loader);
+	assert(owner);
 	mName = name;
 	mPath = path;
-	mLoader = loader;
+	mLoader = owner;
 	mIsLoaded = false;
 }
 

@@ -9,4 +9,4 @@ manifest = "manifest.lua"
 -- It's executed at the start
 --
 main_script = "main.lua"
-
+on_update = "update()"
