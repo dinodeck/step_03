@@ -1,5 +1,6 @@
 #include "LuaState.h"
 #include <assert.h>
+#include <string.h>
 
 extern "C"
 {
@@ -13,10 +14,10 @@ LuaState::LuaState(const char* name) :
     mName(name),
     mLuaState(NULL)
 {
-    mName = name;
     // lua_newstate( MemHandler, NULL ); <- can use this to get some mem stats
     Reset();
 }
+
 
 LuaState::~LuaState()
 {
@@ -25,12 +26,7 @@ LuaState::~LuaState()
 
 LuaState* LuaState::GetWrapper(lua_State* luaState)
 {
-	// Needs sanity checks.
-	lua_pushliteral(luaState, "this");  /* push address */
-    lua_gettable(luaState, LUA_REGISTRYINDEX);  /* retrieve value */
-    LuaState* wrapper = static_cast<LuaState*>(lua_touserdata(luaState, -1));
-    lua_pop(luaState, 1); // pop the user data off the top of the stack
-    return wrapper;
+    return static_cast<LuaState*>(LuaState::GetFromRegistry(luaState, "this"));
 }
 
 int LuaState::LuaError(lua_State* luaState)
@@ -116,7 +112,6 @@ bool LuaState::DoFile(const char* path)
 	// No package management at the moment so this is simple
 	lua_pushcfunction(mLuaState, LuaState::LuaError);
 	int fail = luaL_loadfile(mLuaState, path);
-
 	if(fail)
 	{
 		printf("\n[LUASTATE|%s] Error: %s\n", mName, lua_tostring(mLuaState, -1));
@@ -124,9 +119,11 @@ bool LuaState::DoFile(const char* path)
 	}
 	else
 	{
+        printf("\nBefore dofile protected call\n");
 		// Execute the string on the stack
 		// If anything goes wrong call the function under that
 		bool result = lua_pcall(mLuaState, 0, LUA_MULTRET, -2) == 0;
+        printf("\nAfter dofile protected call\n");
 		lua_pop(mLuaState, 1); // remove error function
 		return result;
 	}
@@ -157,16 +154,30 @@ void LuaState::Reset()
     }
     mLuaState = lua_open();
     luaL_openlibs(mLuaState);
-    // Push minigame instance pointer in the lua state
-    // So for static functions (used by Lua) we can find out the minigame associated with a lua state
-    lua_pushliteral(mLuaState, "this");  /* push value */
-    lua_pushlightuserdata(mLuaState, (void *)this);  /* push address */
-
-    /* registry["this"] = this */
-    lua_settable(mLuaState, LUA_REGISTRYINDEX);
+    // Push object instance pointer in the lua state
+    // So for static functions (used by Lua) we can retrieve this object associated with a lua state
+    InjectIntoRegistry("this", this);
 }
 
 void LuaState::CollectGarbage()
 {
     lua_gc(mLuaState, LUA_GCCOLLECT, 0);
 }
+
+void LuaState::InjectIntoRegistry(const char* key, void* object)
+{
+    lua_pushlstring(mLuaState, key, strlen(key));
+    lua_pushlightuserdata(mLuaState, object);       /* push value */
+    lua_settable(mLuaState, LUA_REGISTRYINDEX);     /* registry[key] = value */
+}
+
+void* LuaState::GetFromRegistry(lua_State* state, const char* key)
+{
+    lua_pushlstring(state, key, strlen(key));
+    // Needs sanity checks.
+    lua_gettable(state, LUA_REGISTRYINDEX);  /* retrieve value */
+    void* object = lua_touserdata(state, -1);
+    lua_pop(state, 1); // pop the user data off the top of the stack
+    return object;
+}
+

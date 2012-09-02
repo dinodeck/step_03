@@ -266,6 +266,7 @@ void Main::Execute()
 void Main::OnUpdate()
 {
 	// Game code goes here.
+    mGame->Update();
 }
 
 int main(int argc, char *argv[]){

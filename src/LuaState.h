@@ -30,6 +30,9 @@ public:
 	void CollectGarbage();
 	lua_State* State() const;
 	unsigned int ItemsInStack();
+	void InjectIntoRegistry(const char* key, void* value);
+	static void* GetFromRegistry(lua_State* state, const char* key);
 };
+
 
 #endif

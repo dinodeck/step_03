@@ -22,6 +22,8 @@ public:
 
     Game(Settings* settings, AssetStore* assetStore);
     ~Game();
+
+    static void Bind(LuaState* state);
     // Callbacks for Assets
     virtual bool OnAssetReload(Asset& asset);
     virtual void OnAssetDestroyed(Asset& asset);
@@ -32,6 +34,7 @@ public:
     // Reloads the lua state.
     void Reset();
     void Update();
+    void Break() { mReady = false; }
 };
 
 #endif

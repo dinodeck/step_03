@@ -5,6 +5,13 @@
 #include "Settings.h"
 #include "AssetStore.h"
 
+extern "C"
+{
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+}
+
 Game::Game(Settings* settings, AssetStore* assetStore) :
     mReloadCount(0),
     mLuaState(NULL),
@@ -13,6 +20,7 @@ Game::Game(Settings* settings, AssetStore* assetStore) :
     mAssetStore(assetStore)
 {
     mLuaState = new LuaState("Game");
+    Game::Bind(mLuaState);
 }
 
 Game::~Game()
@@ -23,6 +31,8 @@ Game::~Game()
         mLuaState = NULL;
     }
 }
+
+
 
 bool Game::OnAssetReload(Asset& asset)
 {
@@ -38,10 +48,12 @@ void Game::OnAssetDestroyed(Asset& asset)
     mReloadCount++;
 }
 
- void Game::Reset()
- {
+
+void Game::Reset()
+{
     printf("Going to reload the lua state.\n");
     mLuaState->Reset();
+    Game::Bind(mLuaState);
 
     // Main Script Id, needs to be taken from the asset store.
     // Settings->mainScript
@@ -67,10 +79,10 @@ void Game::OnAssetDestroyed(Asset& asset)
         printf("\tPress F2 to reload.\n");
         mReady = false;
     }
- }
+}
 
- void Game::Update()
- {
+void Game::Update()
+{
     if(!mReady)
     {
         return;
@@ -93,7 +105,7 @@ void Game::OnAssetDestroyed(Asset& asset)
 
     bool result = mLuaState->DoString("update()");
 
-    if(result == 1)
+    if(!result)
     {
         printf("Press F2 to reload.\n");
         mReady = false;
@@ -102,4 +114,26 @@ void Game::OnAssetDestroyed(Asset& asset)
     // Force a full collect each frame
     mLuaState->CollectGarbage();
 
- }
+}
+
+
+int lua_load_library(lua_State* state)
+{
+    if(1 != lua_gettop(state) || !lua_isstring(state,  -1))
+    {
+        lua_pushstring(state, "Load Library: library name expected.\n");
+        return lua_error(state);
+    }
+
+    // Get the library name passed in.
+    const char* strLibName = lua_tostring(state,  -1);
+    printf("Requested loading:[%s]\n", strLibName);
+    lua_pop(state, 1); // clear the string.
+    return 0;
+}
+
+void Game::Bind(LuaState* state)
+{
+    // Bind functions such as load library.
+    lua_register(state->State(), "LoadLibrary", lua_load_library);
+}

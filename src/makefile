@@ -2,7 +2,7 @@
 CC=g++
 CFLAGS=-c -Wall -Dmain=SDL_main -I../lib/LuaJIT/src
 LDFLAGS=-L/usr/local/lib -static-libgcc -static-libstdc++ -lmingw32 -lSDLmain -lSDL -lopengl32 -lws2_32 -lwinmm ../lib/LuaJIT/src/libluajit.a
-SOURCES=main.cpp Game.cpp IO.cpp LuaState.cpp Asset.cpp AssetStore.cpp
+SOURCES=main.cpp Renderer.cpp Game.cpp IO.cpp LuaState.cpp Asset.cpp AssetStore.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=lualoop
 
