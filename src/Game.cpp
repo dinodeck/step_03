@@ -1,18 +1,13 @@
 #include "Game.h"
-#include "IAssetOwner.h"
+
 #include "Asset.h"
+#include "DancingSquidLua.h"
+#include "IAssetOwner.h"
 #include "LuaState.h"
+#include "ManifestAssetStore.h"
 #include "Settings.h"
-#include "AssetStore.h"
 
-extern "C"
-{
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
-
-Game::Game(Settings* settings, AssetStore* assetStore) :
+Game::Game(Settings* settings, ManifestAssetStore* assetStore) :
     mReloadCount(0),
     mLuaState(NULL),
     mReady(false),
@@ -32,11 +27,8 @@ Game::~Game()
     }
 }
 
-
-
 bool Game::OnAssetReload(Asset& asset)
 {
-
     printf("Script asset should be reloaded: [%s]\n", asset.Name().c_str());
     mReloadCount++;
     return true;

@@ -2,13 +2,8 @@
 #include <assert.h>
 #include <string.h>
 
-extern "C"
-{
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
-
+#include "DancingSquidLua.h"
+#include "DSFile.h"
 
 LuaState::LuaState(const char* name) :
     mName(name),
@@ -107,26 +102,38 @@ bool LuaState::DoString(const char* str)
 	}
 }
 
+bool LuaState::DoBuffer(const char* name, const char* buffer, unsigned int size)
+{
+    assert(buffer);
+    lua_pushcfunction(mLuaState, LuaState::LuaError);
+    int fail = luaL_loadbuffer
+    (
+        mLuaState,
+        buffer,
+        size,
+        name
+    );
+
+    if(fail)
+    {
+        printf("\n[LUASTATE|%s] Error: %s\n", mName, lua_tostring(mLuaState, -1));
+        return false;
+    }
+    else
+    {
+        // Execute the string on the stack
+        // If anything goes wrong call the function under that
+        bool result = lua_pcall(mLuaState, 0, LUA_MULTRET, -2) == 0;
+        lua_pop(mLuaState, 1); // remove error function
+        return result;
+    }
+}
+
 bool LuaState::DoFile(const char* path)
 {
-	// No package management at the moment so this is simple
-	lua_pushcfunction(mLuaState, LuaState::LuaError);
-	int fail = luaL_loadfile(mLuaState, path);
-	if(fail)
-	{
-		printf("\n[LUASTATE|%s] Error: %s\n", mName, lua_tostring(mLuaState, -1));
-		return false;
-	}
-	else
-	{
-        printf("\nBefore dofile protected call\n");
-		// Execute the string on the stack
-		// If anything goes wrong call the function under that
-		bool result = lua_pcall(mLuaState, 0, LUA_MULTRET, -2) == 0;
-        printf("\nAfter dofile protected call\n");
-		lua_pop(mLuaState, 1); // remove error function
-		return result;
-	}
+    DSFile file(path);
+    file.LoadFileIntoBuffer();
+    return DoBuffer(path, file.Buffer(), file.Size());
 }
 
 std::string LuaState::GetString(const char* key, const char* defaultStr)

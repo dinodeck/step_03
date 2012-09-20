@@ -5,7 +5,7 @@
 class Asset;
 class LuaState;
 struct Settings;
-class AssetStore;
+class ManifestAssetStore;
 
 //
 // Responsible for calling the Lua update script.
@@ -13,14 +13,14 @@ class AssetStore;
 class Game : public IAssetOwner
 {
     // used as counter to determine if the lua state should be reloaded.
-    unsigned int mReloadCount;
-    LuaState* mLuaState;
-    bool mReady;
-    Settings* mSettings;
-    AssetStore* mAssetStore;
+    unsigned int        mReloadCount;
+    LuaState*           mLuaState;
+    bool                mReady;
+    Settings*           mSettings;
+    ManifestAssetStore* mAssetStore;
 public:
 
-    Game(Settings* settings, AssetStore* assetStore);
+    Game(Settings* settings, ManifestAssetStore* assetStore);
     ~Game();
 
     static void Bind(LuaState* state);
