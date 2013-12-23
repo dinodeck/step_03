@@ -100,6 +100,7 @@ void Main::Execute()
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS,  1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES,  2);
 
+    ResetRenderWindow();
     OnOpenGLContextCreated();
 
     unsigned int thisTime = 0;
